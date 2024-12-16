@@ -16,10 +16,19 @@ namespace nback
 {
     public class Speech : IDisposable
     {
-
-        // Speech
-        private static string[] NUMBERS = new string[] { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" };
-
+        // Default language -- will try to match recognizer culture.  In Settings, adjust speech recognition settings in Time and Language.
+        private static string language = "en";
+        // Microsoft Windows Vista SAPI 5.3 includes support for (at least): US English, UK English, traditional Chinese, simplified Chinese, Japanese, Spanish, French, German.
+        private static Dictionary<string, string[]> NUMBERS = new Dictionary<string, string[]>()
+        {
+            //                      0           1           2           3           4           5           6           7           8           9
+            { "en", new string[] {  "zero",     "one",      "two",      "three",    "four",    "five",      "six",      "seven",    "eight",    "nine"  } }, // "en-US" / "en-GB"
+            { "zh", new string[] {  "líng",     "yī",       "èr",       "sān",      "sì",      "wǔ",        "liù",      "qī",       "bā",       "jiǔ"   } }, // "zh-TW" / "zh-CN"
+            { "ja", new string[] {  "rei",      "ichi",     "ni",       "san",      "shi",     "go",        "roku",     "shichi",   "hachi",    "kyū"   } },
+            { "es", new string[] {  "cero",     "uno",      "dos",      "tres",     "cuatro",  "cinco",     "seis",     "siete",    "ocho",     "nueve" } },
+            { "fr", new string[] {  "zéro",     "un",       "deux",     "trois",    "quatre",  "cinq",      "six",      "sept",     "huit",     "neuf"  } },
+            { "de", new string[] {  "null",     "eins",     "zwei",     "drei",     "vier",    "fünf",      "sechs",    "sieben",   "acht",     "neun"  } },
+        };
 
         private SpeechSynthesizer speechSynthesizer;
         private SpeechRecognizer speechRecognizer;
@@ -136,9 +145,8 @@ namespace nback
             System.Diagnostics.Trace.TraceInformation("SYNTHESIZER: " + speechSynthesizer.Voice + " (simulate: " + speechSynthesizerResponse.Voice + ").");
 
             // Create speech recognizer
-            speechRecognizer = new SpeechRecognizerInProc();
-            speechRecognizer = new SpeechRecognizer();
-            System.Diagnostics.Trace.TraceInformation("RECOGNIZER: " + "[" + speechRecognizer.RecognizerInfo.Id + "] " + speechRecognizer.RecognizerInfo.Name + " - \"" + speechRecognizer.RecognizerInfo.Description + "\".");
+            speechRecognizer = new SpeechRecognizer();      // new SpeechRecognizerInProc();
+            System.Diagnostics.Trace.TraceInformation("RECOGNIZER: " + "[" + speechRecognizer.RecognizerInfo.Id + "] " + speechRecognizer.RecognizerInfo.Name + " - \"" + speechRecognizer.RecognizerInfo.Description + "\" Culture=" + speechRecognizer.RecognizerInfo.Culture.Name + " (" + speechRecognizer.RecognizerInfo.Culture.DisplayName + ").");
 
             speechRecognizer.Enabled = false;
             speechRecognizer.UnloadAllGrammars();
@@ -151,12 +159,18 @@ namespace nback
             speechRecognizer.SpeechRecognized += speechRecognizer_SpeechRecognized;
             speechRecognizer.AudioSignalProblemOccurred += speechRecognizer_AudioSignalProblemOccurred;
 
-            grammars = new Grammar[NUMBERS.Length];
+            // Match language from speech recognizer culture: full culture, or initial two letters.
+            if (NUMBERS.ContainsKey(speechRecognizer.RecognizerInfo.Culture.Name)) { language = speechRecognizer.RecognizerInfo.Culture.Name; }
+            else if (NUMBERS.ContainsKey(speechRecognizer.RecognizerInfo.Culture.Name.Substring(0, 2))) { language = speechRecognizer.RecognizerInfo.Culture.Name.Substring(0, 2); }
+            // else { language = "en"; }
+            System.Diagnostics.Trace.TraceInformation("LANGUAGE: " + language + "");
+
+            grammars = new Grammar[NUMBERS[language].Length];
             try
             {
                 for (int i = 0; i < grammars.Length; i++)
                 {
-                    SemanticResultValue numberValue = new SemanticResultValue(NUMBERS[i], i);
+                    SemanticResultValue numberValue = new SemanticResultValue(NUMBERS[language][i], i);
                     SemanticResultKey numberKey = new SemanticResultKey("number", numberValue);
                     GrammarBuilder grammarBuilder = new GrammarBuilder(numberKey);
                     grammarBuilder.Culture = speechRecognizer.RecognizerInfo.Culture;       // ADDED
@@ -558,7 +572,7 @@ long now = now2;
                         session.Entries[bindingSource.Position].SimulateTimestamp = 0;
                         session.Entries[bindingSource.Position].ReceiveSymbol = -1;
                         int symbol = session.Entries[bindingSource.Position].SpeakSymbol;
-                        speechSynthesizer.SpeakAsync(NUMBERS[symbol].ToString());
+                        speechSynthesizer.SpeakAsync(NUMBERS[language][symbol].ToString());
 
                         SetLikely();
                     }
@@ -572,7 +586,7 @@ long now = now2;
                 {
                     session.Entries[index].SimulateTimestamp = now2;
                     int symbol = session.Entries[index].SpeakSymbol;
-                    speechSynthesizerResponse.SpeakAsync(NUMBERS[symbol].ToString());
+                    speechSynthesizerResponse.SpeakAsync(NUMBERS[language][symbol].ToString());
                 }
             }
 
@@ -611,7 +625,7 @@ FractionY = fy;
                     int n;
                     do
                     {
-                        n = random.Next(1, NUMBERS.Length);
+                        n = random.Next(1, NUMBERS[language].Length);
                     } while (lastItem != null && n == lastItem.Number);
                     numberList.AddPreOutput(n);
                 }
